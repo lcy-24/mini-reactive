@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mini-reactive · 手写 Vue3 响应式系统</title>
+  <script type="importmap">
+  { "imports": { "mini-reactive": "https://cdn.jsdelivr.net/npm/mini-reactive@1.0.0/dist/index.js" } }
+  </script>
+  <style>
+    :root { --bg:#f7f8fa; --card:#fff; --border:#e5e7eb; --text:#1f2329; --muted:#6b7280;
+      --accent:#3b82f6; --green:#10b981; --purple:#8b5cf6; --amber:#f59e0b; --code-bg:#f3f4f6; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+      background:var(--bg); color:var(--text); padding:24px; }
+    .wrap { max-width:960px; margin:0 auto; }
+    h1 { font-size:22px; margin:0 0 4px; }
+    .sub { color:var(--muted); font-size:14px; margin-bottom:24px; }
+    .sub code { background:var(--code-bg); padding:2px 6px; border-radius:4px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    @media (max-width:720px){ .grid { grid-template-columns:1fr; } }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; }
+    .card h2 { font-size:16px; margin:0 0 14px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+    button { border:1px solid var(--border); background:#fff; color:var(--text);
+      padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; }
+    button:hover { border-color:var(--accent); color:var(--accent); }
+    button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .state { background:var(--code-bg); border-radius:10px; padding:14px; font-family:"SF Mono",Menlo,Consolas,monospace; font-size:13px; line-height:1.8; margin-bottom:14px; }
+    .state b { color:var(--accent); }
+    .big { font-size:28px; font-weight:700; margin:4px 0; }
+    .big .v { color:var(--accent); }
+    .label { font-size:12px; color:var(--muted); }
+    .log { background:#0f172a; color:#d1d5db; border-radius:10px; padding:12px;
+      font-family:"SF Mono",Menlo,Consolas,monospace; font-size:12px; height:300px;
+      overflow-y:auto; line-height:1.8; }
+    .log .t { color:#64748b; }
+    .log .ef { color:#93c5fd; }
+    .log .cp { color:#a5b4fc; }
+    .log .wt { color:#6ee7b7; }
+    .tag { display:inline-block; font-size:11px; padding:1px 8px; border-radius:10px; color:#fff; margin-left:6px; }
+    .tag.ef { background:var(--accent); }
+    .tag.cp { background:var(--purple); }
+    .tag.wt { background:var(--green); }
+    .stat { display:flex; justify-content:space-between; font-size:13px; padding:6px 0; border-bottom:1px dashed var(--border); }
+    .stat:last-child { border-bottom:none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>mini-reactive <span class="tag ef">手写 Vue3 响应式</span></h1>
+    <p class="sub">Proxy + 依赖收集，零依赖。安装：<code>npm i mini-reactive</code>。下面每一步都是真实运行，不是演示数据。</p>
+
+    <div class="grid">
+      <!-- 左：状态操作 -->
+      <div>
+        <div class="card">
+          <h2>① reactive 状态</h2>
+          <div class="state">
+            <div>state = reactive({ <b>count: <span id="countVal">0</span></b>, user: { name: '<span id="nameVal">小龙</span>' } })</div>
+          </div>
+          <div class="row">
+            <button class="primary" onclick="actions.inc()">count++</button>
+            <button onclick="actions.dec()">count--</button>
+            <button onclick="actions.rename()">改 user.name</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>② 派生与侦听</h2>
+          <div class="stat"><span>computed：double = count × 2</span><span class="big" style="font-size:20px"><b id="doubleVal">0</b></span></div>
+          <div class="stat"><span>computed 实际计算次数（验证缓存）</span><span><b id="computedRuns">0</b></span></div>
+          <div class="stat"><span>effect 触发次数</span><span><b id="effectRuns">0</b></span></div>
+          <div class="stat"><span>watch 触发次数</span><span><b id="watchRuns">0</b></span></div>
+        </div>
+      </div>
+
+      <!-- 右：日志 -->
+      <div class="card">
+        <h2>运行日志（实时）</h2>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { reactive, computed, effect, watch } from 'mini-reactive'
+
+    const logEl = document.getElementById('log')
+    function log(msg, cls = 'ef') {
+      const t = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+      const line = document.createElement('div')
+      line.innerHTML = `<span class="t">${t}</span> <span class="${cls}">${msg}</span>`
+      logEl.appendChild(line); logEl.scrollTop = logEl.scrollHeight
+    }
+
+    const state = reactive({ count: 0, user: { name: '小龙' } })
+    const el = (id) => document.getElementById(id)
+
+    // effect：依赖 count，自动追踪
+    let effectRuns = 0
+    effect(() => {
+      effectRuns++
+      el('effectRuns').textContent = effectRuns
+      el('countVal').textContent = state.count
+      log(`effect 执行（第 ${effectRuns} 次）：count = ${state.count}`, 'ef')
+    })
+
+    // computed：惰性求值 + 缓存
+    let computedRuns = 0
+    const double = computed(() => {
+      computedRuns++
+      el('computedRuns').textContent = computedRuns
+      log(`computed 重算（第 ${computedRuns} 次）：count=${state.count} → ${state.count * 2}`, 'cp')
+      return state.count * 2
+    })
+    // 连续读 3 次，只算 1 次（缓存验证）
+    double.value; double.value; double.value
+    el('doubleVal').textContent = double.value
+
+    // watch：拿新旧值
+    let watchRuns = 0
+    watch(() => state.user.name, (nv, ov) => {
+      watchRuns++
+      el('watchRuns').textContent = watchRuns
+      el('nameVal').textContent = nv
+      log(`watch 回调：user.name "${ov}" → "${nv}"`, 'wt')
+    })
+
+    // 暴露给按钮
+    window.actions = {
+      inc: () => state.count++,
+      dec: () => state.count--,
+      rename: () => {
+        const names = ['小龙', '阿豪', '老王', '小李']
+        const cur = names.indexOf(state.user.name)
+        state.user.name = names[(cur + 1) % names.length]
+      },
+    }
+
+    log('初始化完成：effect 已自动执行一次，computed 惰性读取 3 次仅计算 1 次', 'wt')
+  </script>
+</body>
+</html>
