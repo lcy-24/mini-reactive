@@ -1,0 +1,50 @@
+{
+  "name": "mini-reactive",
+  "version": "1.0.0",
+  "description": "手写 Vue3 响应式系统核心：reactive / ref / computed / effect / watch，基于 Proxy + 依赖收集，零依赖、全 TypeScript，面试手写题的标准答案 + 可运行实现",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "vue",
+    "vue3",
+    "reactivity",
+    "reactive",
+    "ref",
+    "computed",
+    "effect",
+    "watch",
+    "proxy",
+    "dependency-tracking",
+    "typescript",
+    "interview"
+  ],
+  "author": "jackiechan",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lcy-24/mini-reactive.git"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}
